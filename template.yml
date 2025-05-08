@@ -55,7 +55,7 @@ Resources:
       HealthyThresholdCount: 5
       UnhealthyThresholdCount: 2
       Matcher:
-        HttpCode: !Ref TargetGroupHealthCheckCodes  # ✅ Accepts user-defined expected HTTP codes
+        HttpCode: !Ref TargetGroupHealthCheckCodes
       Tags:
         - Key: Name
           Value: ECS-Target-Group
@@ -115,7 +115,11 @@ Resources:
     Condition: EnableS3Logging
     Properties:
       BucketName: !Sub "alb-access-logs-${AWS::AccountId}-${AWS::Region}"
-      ObjectOwnership: BucketOwnerEnforced  # ✅ Fix: Remove ACLs and set correct ownership
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
       Tags:
         - Key: Name
           Value: ALB-Access-Logs-Bucket
