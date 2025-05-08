@@ -31,7 +31,7 @@ Parameters:
     Type: String
     Description: Enable S3 Access Logs for Load Balancer (true/false)
     AllowedValues: ["true", "false"]
-    Default: "true"
+    Default: "false"
 
 # Conditions section - controls whether S3 logging is enabled
 Conditions:
