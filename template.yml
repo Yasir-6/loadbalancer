@@ -1,22 +1,23 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
-Description: Professional Load Balancer Stack for ECS Deployment (Without HTTPS & ACM) with In-Place Updates and Compliant Naming
+Description: Professional Load Balancer Stack for ECS Deployment (Without HTTPS & ACM)
 
+# Parameters section - defines inputs required for the template
 Parameters:
   TargetGroupPort:
     Type: Number
     Description: Port for the Target Group
-    Default: 80
+    Default: 80  # Default port for HTTP traffic
 
   TargetGroupHealthCheckPath:
     Type: String
-    Description: Health check path for the Target Group
+    Description: (Optional) Health check path for the Target Group
     Default: "/health"
 
   TargetGroupHealthCheckCodes:
     Type: String
     Description: Expected HTTP response codes for health checks (e.g., 200, 301)
-    Default: "200"
+    Default: "200"  # Default: Expecting only 200 OK responses
 
   VpcId:
     Type: AWS::EC2::VPC::Id
@@ -32,14 +33,17 @@ Parameters:
     AllowedValues: ["true", "false"]
     Default: "false"
 
+# Conditions section - controls whether S3 logging is enabled
 Conditions:
   EnableS3Logging: !Equals [!Ref EnableAccessLogs, "true"]
 
+# Resources section - defines the AWS resources to be created
 Resources:
+  # Creates a target group for ECS services with configurable health check codes
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Name: !Sub "${AWS::StackName}-TG"
+      Name: ECS-Target-Group
       Port: !Ref TargetGroupPort
       Protocol: HTTP
       VpcId: !Ref VpcId
@@ -51,11 +55,12 @@ Resources:
       HealthyThresholdCount: 5
       UnhealthyThresholdCount: 2
       Matcher:
-        HttpCode: !Ref TargetGroupHealthCheckCodes
+        HttpCode: !Ref TargetGroupHealthCheckCodes  # ✅ Accepts user-defined expected HTTP codes
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-TG"
+          Value: ECS-Target-Group
 
+  # Creates a security group for the Load Balancer
   LoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -68,12 +73,13 @@ Resources:
           CidrIp: 0.0.0.0/0
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-SG"
+          Value: LoadBalancer-SG
 
+  # Creates an Application Load Balancer
   LoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Name: !Sub "${AWS::StackName}-ALB"
+      Name: ECS-Application-LB
       Scheme: internet-facing
       Type: application
       SecurityGroups:
@@ -101,18 +107,20 @@ Resources:
           - !Ref AWS::NoValue
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-ALB"
+          Value: ECS-Application-LB
 
+  # Optional: S3 Bucket for ALB Access Logs (Created only if EnableAccessLogs=true)
   AccessLogsBucket:
     Type: AWS::S3::Bucket
     Condition: EnableS3Logging
     Properties:
-      BucketName: !Sub "alb-logs-${AWS::StackName}-${AWS::AccountId}"
-      ObjectOwnership: BucketOwnerEnforced
+      BucketName: !Sub "alb-access-logs-${AWS::AccountId}-${AWS::Region}"
+      ObjectOwnership: BucketOwnerEnforced  # ✅ Fix: Remove ACLs and set correct ownership
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-S3"
+          Value: ALB-Access-Logs-Bucket
 
+  # Optional: Allow ALB to Write Logs to S3 (Only if EnableAccessLogs=true)
   AccessLogsBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Condition: EnableS3Logging
@@ -126,6 +134,7 @@ Resources:
             Action: "s3:PutObject"
             Resource: !Sub "arn:aws:s3:::${AccessLogsBucket}/*"
 
+  # HTTP Listener (Directly forwarding traffic to Target Group)
   ListenerHTTP:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -136,6 +145,7 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
 
+# Outputs section - provides useful information after stack deployment
 Outputs:
   LoadBalancerDNSName:
     Description: The DNS name of the Load Balancer
