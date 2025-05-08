@@ -1,0 +1,164 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: Professional Load Balancer Stack for ECS Deployment (Without HTTPS & ACM)
+
+# Parameters section - defines inputs required for the template
+Parameters:
+  TargetGroupPort:
+    Type: Number
+    Description: Port for the Target Group
+    Default: 80  # Default port for HTTP traffic
+
+  TargetGroupHealthCheckPath:
+    Type: String
+    Description: (Optional) Health check path for the Target Group
+    Default: "/health"
+
+  TargetGroupHealthCheckCodes:
+    Type: String
+    Description: Expected HTTP response codes for health checks (e.g., 200, 301)
+    Default: "200"  # Default: Expecting only 200 OK responses
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID where the Load Balancer will be created
+
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: List of Subnet IDs for the Load Balancer
+
+  EnableAccessLogs:
+    Type: String
+    Description: Enable S3 Access Logs for Load Balancer (true/false)
+    AllowedValues: ["true", "false"]
+    Default: "false"
+
+# Conditions section - controls whether S3 logging is enabled
+Conditions:
+  EnableS3Logging: !Equals [!Ref EnableAccessLogs, "true"]
+
+# Resources section - defines the AWS resources to be created
+Resources:
+  # Creates a target group for ECS services with configurable health check codes
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: ECS-Target-Group
+      Port: !Ref TargetGroupPort
+      Protocol: HTTP
+      VpcId: !Ref VpcId
+      TargetType: ip
+      HealthCheckPath: !Ref TargetGroupHealthCheckPath
+      HealthCheckProtocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      UnhealthyThresholdCount: 2
+      Matcher:
+        HttpCode: !Ref TargetGroupHealthCheckCodes  # ✅ Accepts user-defined expected HTTP codes
+      Tags:
+        - Key: Name
+          Value: ECS-Target-Group
+
+  # Creates a security group for the Load Balancer
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for the Load Balancer allowing HTTP
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: LoadBalancer-SG
+
+  # Creates an Application Load Balancer
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: ECS-Application-LB
+      Scheme: internet-facing
+      Type: application
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      Subnets: !Ref SubnetIds
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: '60'
+        - Key: deletion_protection.enabled
+          Value: 'true'
+        - !If 
+          - EnableS3Logging
+          - Key: access_logs.s3.enabled
+            Value: 'true'
+          - !Ref AWS::NoValue
+        - !If
+          - EnableS3Logging
+          - Key: access_logs.s3.bucket
+            Value: !Ref AccessLogsBucket
+          - !Ref AWS::NoValue
+        - !If
+          - EnableS3Logging
+          - Key: access_logs.s3.prefix
+            Value: "alb-logs"
+          - !Ref AWS::NoValue
+      Tags:
+        - Key: Name
+          Value: ECS-Application-LB
+
+  # Optional: S3 Bucket for ALB Access Logs (Created only if EnableAccessLogs=true)
+  AccessLogsBucket:
+    Type: AWS::S3::Bucket
+    Condition: EnableS3Logging
+    Properties:
+      BucketName: !Sub "alb-access-logs-${AWS::AccountId}-${AWS::Region}"
+      ObjectOwnership: BucketOwnerEnforced  # ✅ Fix: Remove ACLs and set correct ownership
+      Tags:
+        - Key: Name
+          Value: ALB-Access-Logs-Bucket
+
+  # Optional: Allow ALB to Write Logs to S3 (Only if EnableAccessLogs=true)
+  AccessLogsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: EnableS3Logging
+    Properties:
+      Bucket: !Ref AccessLogsBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: "logdelivery.elasticloadbalancing.amazonaws.com"
+            Action: "s3:PutObject"
+            Resource: !Sub "arn:aws:s3:::${AccessLogsBucket}/*"
+
+  # HTTP Listener (Directly forwarding traffic to Target Group)
+  ListenerHTTP:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Protocol: HTTP
+      Port: 80
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+# Outputs section - provides useful information after stack deployment
+Outputs:
+  LoadBalancerDNSName:
+    Description: The DNS name of the Load Balancer
+    Value: !GetAtt LoadBalancer.DNSName
+
+  LoadBalancerArn:
+    Description: The ARN of the Load Balancer
+    Value: !Ref LoadBalancer
+
+  TargetGroupArn:
+    Description: The ARN of the Target Group
+    Value: !Ref TargetGroup
+
+  LoadBalancerSecurityGroupId:
+    Description: The ID of the Load Balancer Security Group
+    Value: !Ref LoadBalancerSecurityGroup
