@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
-Description: Professional Load Balancer Stack for ECS Deployment (Without HTTPS & ACM) with In-Place Updates for All Properties
+Description: Professional Load Balancer Stack for ECS Deployment (Without HTTPS & ACM) with In-Place Updates and Compliant Naming
 
 Parameters:
   TargetGroupPort:
@@ -39,7 +39,7 @@ Resources:
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Name: !Sub "${AWS::StackName}-Target-Group"
+      Name: !Sub "${AWS::StackName}-TG"
       Port: !Ref TargetGroupPort
       Protocol: HTTP
       VpcId: !Ref VpcId
@@ -54,7 +54,7 @@ Resources:
         HttpCode: !Ref TargetGroupHealthCheckCodes
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-Target-Group"
+          Value: !Sub "${AWS::StackName}-TG"
 
   LoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -68,12 +68,12 @@ Resources:
           CidrIp: 0.0.0.0/0
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-LoadBalancer-SG"
+          Value: !Sub "${AWS::StackName}-SG"
 
   LoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Name: !Sub "${AWS::StackName}-Application-LB"
+      Name: !Sub "${AWS::StackName}-ALB"
       Scheme: internet-facing
       Type: application
       SecurityGroups:
@@ -101,17 +101,17 @@ Resources:
           - !Ref AWS::NoValue
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-Application-LB"
+          Value: !Sub "${AWS::StackName}-ALB"
 
   AccessLogsBucket:
     Type: AWS::S3::Bucket
     Condition: EnableS3Logging
     Properties:
-      BucketName: !Sub "alb-access-logs-${AWS::StackName}-${AWS::AccountId}-${AWS::Region}"
+      BucketName: !Sub "alb-logs-${AWS::StackName}-${AWS::AccountId}"
       ObjectOwnership: BucketOwnerEnforced
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-ALB-Access-Logs-Bucket"
+          Value: !Sub "${AWS::StackName}-S3"
 
   AccessLogsBucketPolicy:
     Type: AWS::S3::BucketPolicy
