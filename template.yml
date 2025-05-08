@@ -17,7 +17,7 @@ Parameters:
   TargetGroupHealthCheckCodes:
     Type: String
     Description: Expected HTTP response codes for health checks (e.g., 200, 301)
-    Default: "200"  # Default: Expecting only 200 OK responses
+    Default: "201"  # Default: Expecting only 200 OK responses
 
   VpcId:
     Type: AWS::EC2::VPC::Id
