@@ -43,7 +43,7 @@ Resources:
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Name: ECS-Target-Group
+      Name: ECS-Target-Group1
       Port: !Ref TargetGroupPort
       Protocol: HTTP
       VpcId: !Ref VpcId
