@@ -17,7 +17,7 @@ Parameters:
   TargetGroupHealthCheckCodes:
     Type: String
     Description: Expected HTTP response codes for health checks (e.g., 200, 301)
-    Default: "201"  # Default: Expecting only 200 OK responses
+    Default: "200"  # Default: Expecting only 200 OK responses
 
   VpcId:
     Type: AWS::EC2::VPC::Id
@@ -43,7 +43,7 @@ Resources:
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Name: ECS-Target-Group1
+      Name: ECS-Target-Group
       Port: !Ref TargetGroupPort
       Protocol: HTTP
       VpcId: !Ref VpcId
@@ -55,7 +55,7 @@ Resources:
       HealthyThresholdCount: 5
       UnhealthyThresholdCount: 2
       Matcher:
-        HttpCode: !Ref TargetGroupHealthCheckCodes
+        HttpCode: !Ref TargetGroupHealthCheckCodes  # ✅ Accepts user-defined expected HTTP codes
       Tags:
         - Key: Name
           Value: ECS-Target-Group
@@ -115,11 +115,7 @@ Resources:
     Condition: EnableS3Logging
     Properties:
       BucketName: !Sub "alb-access-logs-${AWS::AccountId}-${AWS::Region}"
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
+      ObjectOwnership: BucketOwnerEnforced  # ✅ Fix: Remove ACLs and set correct ownership
       Tags:
         - Key: Name
           Value: ALB-Access-Logs-Bucket
