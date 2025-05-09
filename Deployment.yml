@@ -1,0 +1,8 @@
+template-file-path: template.yml
+parameters:
+  TargetGroupHealthCheckCodes: '200'
+  TargetGroupHealthCheckPath: /health
+  VpcId: vpc-0e0063f4338cdd0eb
+  TargetGroupPort: '3000'
+  SubnetIds: subnet-076e73e893c24ac69,subnet-000a50eba179ba5d3
+tags: {}
